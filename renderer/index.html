@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-eval' 'unsafe-inline';
+             style-src 'self' 'unsafe-inline';
+             connect-src http://localhost:11434 http://127.0.0.1:11434 ws://localhost:* ws://127.0.0.1:*;
+             img-src 'self' data:;
+             font-src 'self' data:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevPilot — Local AI Editor</title>
+  <!-- xterm.js styles (loaded from node_modules) -->
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ───── First-run setup overlay ───── -->
+  <div id="setupOverlay" class="setup-overlay hidden">
+    <div class="setup-card">
+      <div class="setup-logo">Dev<span>Pilot</span></div>
+      <p class="setup-sub">Local AI code editor · powered by Ollama</p>
+      <div id="setupSteps" class="setup-steps"></div>
+      <div id="setupLog"   class="setup-log"></div>
+      <div id="setupActions" class="setup-actions"></div>
+    </div>
+  </div>
+
+  <!-- ───── Main app shell ───── -->
+  <div id="appShell" class="app hidden">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="left">
+        <div class="brand">Dev<span>Pilot</span></div>
+        <button id="openFolderBtn" class="btn icon-btn" title="Open Folder">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H7.621a.75.75 0 0 1-.53-.22L5.908 3.097A1.5 1.5 0 0 0 4.848 2.5H1.5z"/></svg>
+          Open Folder
+        </button>
+        <div id="workspaceLabel" class="workspace-label muted">No workspace</div>
+      </div>
+      <div class="right">
+        <label class="field" title="Ollama host">
+          <span>Host</span>
+          <input id="hostInput" value="http://localhost:11434" spellcheck="false" />
+        </label>
+        <label class="field" title="Model">
+          <span>Model</span>
+          <select id="modelSelect">
+            <option value="llama3.2">llama3.2</option>
+          </select>
+        </label>
+        <select id="modeSelect" title="Chat mode">
+          <option value="chat">Chat</option>
+          <option value="agent">Agent (edits)</option>
+        </select>
+        <button id="refreshModelsBtn" class="btn ghost" title="Refresh model list &amp; check Ollama">⟳ Models</button>
+        <button id="vscodebtn" class="btn ghost vscode-btn hidden" title="Open in VS Code">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="#007ACC" d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 19.5v-15a1.5 1.5 0 0 0-.85-1.413zm-9.756 11.501L7.288 12l6.106-2.088V14.088z"/></svg>
+          VS Code
+        </button>
+      </div>
+    </header>
+
+    <!-- Body: sidebar + center + chat -->
+    <div class="main">
+
+      <!-- Left sidebar: file explorer -->
+      <aside class="sidebar">
+        <div class="pane-title">
+          Explorer
+          <div class="pane-actions">
+            <button id="newFileBtn"   class="icon-action" title="New File">+</button>
+            <button id="refreshTreeBtn" class="icon-action" title="Refresh">⟳</button>
+          </div>
+        </div>
+        <div id="fileTree" class="file-tree muted">Open a folder to browse files.</div>
+      </aside>
+
+      <!-- Center: editor + terminal stacked -->
+      <section class="center-pane">
+
+        <!-- Editor area -->
+        <div class="editor-area" id="editorArea">
+          <div class="tabbar">
+            <div id="activeFile" class="tab">No file open</div>
+            <div class="tab-actions">
+              <button id="openInVscodeFileBtn" class="btn ghost small hidden" title="Open file in VS Code">↗ VS Code</button>
+              <button id="saveBtn" class="btn ghost small" disabled>Save</button>
+            </div>
+          </div>
+          <div id="editor" class="editor"></div>
+          <div id="editorFallback" class="editor-fallback hidden">
+            <textarea id="fallbackTextarea" spellcheck="false"></textarea>
+          </div>
+        </div>
+
+        <!-- Resize handle -->
+        <div id="termResizeHandle" class="term-resize-handle hidden"></div>
+
+        <!-- Terminal area -->
+        <div class="terminal-area hidden" id="terminalArea">
+          <div class="terminal-topbar">
+            <span class="pane-title-inline">Terminal</span>
+            <div class="term-tab-list" id="termTabs"></div>
+            <div class="term-actions">
+              <button id="newTermBtn"   class="icon-action" title="New Terminal">+</button>
+              <button id="closeTermBtn" class="icon-action" title="Hide Terminal">✕</button>
+            </div>
+          </div>
+          <div id="terminalContainer" class="terminal-container"></div>
+        </div>
+
+      </section>
+
+      <!-- Right: AI chat -->
+      <aside class="chat-pane">
+        <div class="pane-title">
+          AI Chat
+          <span id="status" class="status">idle</span>
+        </div>
+        <div id="messages" class="messages"></div>
+        <div id="proposals" class="proposals hidden"></div>
+        <div class="composer">
+          <div class="composer-opts">
+            <label><input type="checkbox" id="includeFileCtx" checked /> File context</label>
+            <label><input type="checkbox" id="includeTermCtx" /> Terminal context</label>
+          </div>
+          <textarea id="promptInput"
+            placeholder="Ask anything, or in Agent mode say 'add error handling to openFile'...&#10;&#10;Ctrl+Enter to send"></textarea>
+          <div class="composer-actions">
+            <button id="sendBtn"  class="btn primary">Send</button>
+            <button id="clearBtn" class="btn ghost">Clear</button>
+            <button id="toggleTermBtn" class="btn ghost" title="Toggle terminal">⬛ Terminal</button>
+          </div>
+        </div>
+      </aside>
+
+    </div><!-- /.main -->
+  </div><!-- /#appShell -->
+
+  <!-- Monaco AMD loader -->
+  <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
+  <!-- xterm.js -->
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+  <!-- App logic -->
+  <script src="renderer.js"></script>
+</body>
+</html>
