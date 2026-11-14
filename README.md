@@ -1,5 +1,7 @@
 # DevPilot — Local AI code editor
 
+> **Project hub** - all three of my local-first tools in one place: https://josses61-local-first-ai-developer-tools-axom-exu9s4g2a2.openbot.site
+
 <img src="docs/banner.png" alt="DevPilot - a local AI code editor with an agent that asks before it edits" width="100%">
 
 DevPilot is a desktop code editor built with Electron that talks to a model running on your own
