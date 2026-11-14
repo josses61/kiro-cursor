@@ -1,5 +1,7 @@
 # DevPilot — Local AI code editor
 
+<img src="docs/banner.png" alt="DevPilot - a local AI code editor with an agent that asks before it edits" width="100%">
+
 DevPilot is a desktop code editor built with Electron that talks to a model running on your own
 machine through [Ollama](https://ollama.com). It gives you the three things a coding agent needs:
 a real editor, a real terminal, and a model that can propose changes to your files.
